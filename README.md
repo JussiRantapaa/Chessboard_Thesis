@@ -1,2 +1,2 @@
 Repository for my bachelor's thesis automated chess board. Has all the files i used when the project was demoed to my supervisors.
-![Turn start state](https://github.com/user-attachments/assets/3321954a-22d1-4746-a76a-f2dd9c1a4bd5)
+<img src="https://github.com/user-attachments/assets/5ec5dc8d-4563-4e0f-ab45-e7e096a1a535" alt="Alt text" width="300"/>
