@@ -14,6 +14,9 @@ Repository for my bachelor's thesis automated chess board. Has all the software 
 
 <img src="https://github.com/user-attachments/assets/b2d197f4-71ed-422d-942f-532c778e6c95" alt="Alt text" width="300"/>
 
-<img src="https://github.com/user-attachments/assets/8b3990e6-4518-468f-8ec0-4c528397a979" alt="Alt text" width="300"/>
+
+Electronics
+
+<img src="https://github.com/user-attachments/assets/8b3990e6-4518-468f-8ec0-4c528397a979" alt="Alt text" width="400"/>
 
 
