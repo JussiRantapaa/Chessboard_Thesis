@@ -19,6 +19,7 @@ void shift_init(void){
 	GPIOA->ODR |= SHIFT_MR;
 
 }
+
 void shift_load(void){
 	// Load flip-flops
 	GPIOA->ODR |= SHIFT_STCP;
@@ -32,14 +33,17 @@ void shift_load(void){
 	// Set parellel load high to stop loading
 	GPIOA->ODR |= SHIFT_PL;
 }
+
 uint8_t shift_read_8bit(void){
 	shift_load();
 	return SPI2_receive_8bit();
 }
+
 uint16_t shift_read_16bit(void){
 	shift_load();
 	return SPI2_receive_16bit();
 }
+
 uint64_t shift_read_64bit(void){
 	shift_load();
 	uint64_t data = 0;
