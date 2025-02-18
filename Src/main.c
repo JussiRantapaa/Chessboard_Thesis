@@ -15,7 +15,6 @@ uint32_t MAIN_COLOR = MINT;
 
 int main(void)
 {
-
 	uint8_t error_code = 0;
 
 	uint8_t index = 0;
@@ -24,7 +23,7 @@ int main(void)
 	spi1_init();
 	SPI2_init_8bit();
 	shift_init();
-//	error_led_init();
+	error_led_init();
 
 	// Init LED pins and push button
 	GPIO_init(GPIOD,12,OUTPUT,&error_code);
@@ -35,17 +34,11 @@ int main(void)
 	GPIO_init(GPIOB,1,INPUT,&error_code);
 	GPIO_init(GPIOB,3,INPUT,&error_code);
 
-
 	error_handler(&error_code);
-
 
 	uint32_t buffer[NUM_LEDS];
 
-
-
-
 	while(1){
-
 	    // Initialize gamestate variables
 	    Gamestate* gamestate = (Gamestate*)malloc(sizeof(Gamestate));
 	    if(gamestate == NULL)
@@ -77,9 +70,8 @@ int main(void)
 			reset();
 
 	    }
+		// Dimm Leds and then wake them up
 	    tim2_delay_ms(500);
-//	    breathe(MINT,PIECE_STARTING_POS_MASK,buffer,1,10);
-//	    breathe(MINT,PIECE_STARTING_POS_MASK,buffer,1,10);
 	    sleep(RED,PIECE_STARTING_POS_MASK,buffer,20);
 	    tim2_delay_ms(500);
 	    wake_up(MINT,WHITE_STARTING_POS_MASK,buffer,20);
@@ -105,15 +97,8 @@ int main(void)
 	        	goto GAME_START;
 	        }
 			sensor_val = shift_read_64bit();
-
-
-
 	    }
-
 	}
-
-
-
     return 0;
 }
 
