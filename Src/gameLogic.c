@@ -29,30 +29,20 @@ uint32_t color1 = MINT;
 uint32_t color2 = ORANGE;
 uint64_t BOARD_LAST_STATE = PIECE_STARTING_POS_MASK;
 uint64_t new_board_state = 0;
-uint32_t hash2 = 0;
+uint32_t new_hash = 0;
 uint8_t starting_square = 0;
 uint64_t current_board_state = 0;
 uint64_t current_piece_index2 = 0;
 uint64_t ending_square = 0;
 uint64_t en_passant_index = 0;
-uint8_t TEST_VAL = 999;
-uint8_t KING_POS = 0;
-uint8_t MOVE_COUNT = 0;
-uint8_t KING_MOVES = 0;
-char end = 0;
-char start = 0;
 
 void ask_move(char **board,Gamestate* gamestate,uint32_t buffer[]){
     int* move_list = (int*)malloc(sizeof(int) * 100);
     int move_count = 0;
 
-    GPIOD->ODR |= LED3;
-
-    // Compute all the moves for a palyer and store them in the move list
+    // Compute all the moves for a player and store them in the move list
     compute_moves(board,move_list,&move_count,gamestate);
 
-    MOVE_COUNT = move_count;
-    KING_MOVES = gamestate->king_moves;
     // If there are no legal moves check winning conditions
     if(!move_count){
        handle_game_ending(board,gamestate,buffer);
@@ -67,7 +57,6 @@ void ask_move(char **board,Gamestate* gamestate,uint32_t buffer[]){
     	tim2_delay_ms(200);
     }
     free(move_list);
-//    // Make random moves for both players
 }
 void handle_game_ending(char **board,Gamestate* gamestate,uint32_t buffer[]){
 	gamestate->game_over = 1;
@@ -80,6 +69,9 @@ void handle_game_ending(char **board,Gamestate* gamestate,uint32_t buffer[]){
 		uint64_t squares = (1ULL<<(encode(row,col)) | (1ULL<<(((gamestate->move_history[(gamestate->move_number) - 1])>>6) & 0x3F)));
 		breathe(RED,squares,buffer,5,40);
 	}else{
+	// If king is not theatened its a stalemate
+	// Loop all piece positions and breathe them orange to indicate stalemate
+		
 		// For white
 		uint64_t piece_positions = 0;
 		uint16_t piece_count = gamestate->piece_count[WHITE];
@@ -94,154 +86,155 @@ void handle_game_ending(char **board,Gamestate* gamestate,uint32_t buffer[]){
 			piece_positions |= (1ULL<<curr_piece_pos);
 		}
 		breathe(ORANGE,piece_positions,buffer,5,40);
-
 	}
 
 	ws2812_transmit(buffer,NUM_LEDS);
 	reset();
 }
-void handle_user_move(char **board,Gamestate* gamestate,uint32_t buffer[],int move_list[],int move_count){
-    int row,col;
 
+// Messiest function I am so sorry
+void handle_user_move(char **board,Gamestate* gamestate,uint32_t buffer[],int move_list[],int move_count){
+   	int row,col;
+	
 	uint64_t board_start_state = BOARD_LAST_STATE;
 	uint8_t move_made = ILLEGAL_MOVE;
-
+	
 	// Stay in the loop until a legal move is made
 	while(move_made != LEGAL_MOVE){
-		PICKING_UP_PIECE:
-		new_board_state = board_start_state;
+	PICKING_UP_PIECE:
+	new_board_state = board_start_state;
+	
+	// Wait till something changes on the board
+	while(new_board_state == board_start_state){
+		new_board_state = shift_read_64bit();
+	}
+	// XOR what piece was picked up
+	uint64_t current_piece_index = (BOARD_LAST_STATE ^ new_board_state );
+	
+	// Get the index of the starting square
+	starting_square = 0;
+	while (current_piece_index >>= 1) {
+	   starting_square++;
+	}
 
-		// Wait till something changes on the board
-		while(new_board_state == board_start_state){
-			new_board_state = shift_read_64bit();
+   // Get the status of the piece picked up
+	row = decode(starting_square,ROW);
+	col = decode(starting_square,COL);
+	start = board[row][col];
+	int piece_status = get_square_status(board,row,col,gamestate);
+
+	// If its enemy piece light up square and wait until we are in the previous state
+	if(piece_status == ENEMY_PIECE){
+		set_color_according_to_val(RED,buffer,(1ULL<<starting_square));
+		ws2812_transmit(buffer,NUM_LEDS);
+		reset();
+
+		 while(new_board_state != board_start_state){
+			  new_board_state = shift_read_64bit();
+		 }
+		 set_color_according_to_val(0,buffer,(1ULL<<starting_square));
+		 ws2812_transmit(buffer,NUM_LEDS);
+		 reset();
+		 // Go back to the beginning of making a move
+		 goto PICKING_UP_PIECE;
+
+	  // If it's a friendly piece continue
+	}else{
+		uint64_t possible_moves = moves_per_square(starting_square,move_list,move_count);
+
+		// Light up possible moves
+		set_color_according_to_val(MINT,buffer,possible_moves);
+		add_color_according_to_val(ORANGE,buffer,(1ULL<<starting_square));
+		ws2812_transmit(buffer,NUM_LEDS);
+		reset();
+
+		PLACE_PIECE:
+		current_board_state = new_board_state;
+
+		// Wait till the piece is placed somewhere
+		while(current_board_state == new_board_state){
+			current_board_state = shift_read_64bit();
 		}
-		// XOR what piece was picked up
-	   uint64_t current_piece_index = (BOARD_LAST_STATE ^ new_board_state );
 
-	   // Get the index of the starting square
-	   starting_square = 0;
-	   while (current_piece_index >>= 1) {
-		   starting_square++;
-	   }
-
-	   // Get the status of the piece picked up
-		row = decode(starting_square,ROW);
-		col = decode(starting_square,COL);
-		start = board[row][col];
-		int piece_status = get_square_status(board,row,col,gamestate);
-
-		// If its enemy piece light up square and wait until we are in the previous state
-		if(piece_status == ENEMY_PIECE){
-			set_color_according_to_val(RED,buffer,(1ULL<<starting_square));
+		// If the piece is placed back to the original square start the process again
+		if(current_board_state == board_start_state){
+			set_color_according_to_val(0,buffer,possible_moves);
 			ws2812_transmit(buffer,NUM_LEDS);
 			reset();
 
-			 while(new_board_state != board_start_state){
-				  new_board_state = shift_read_64bit();
-			 }
-			 set_color_according_to_val(0,buffer,(1ULL<<starting_square));
-			 ws2812_transmit(buffer,NUM_LEDS);
-			 reset();
-			 // Go back to the beginning of making a move
-			 goto PICKING_UP_PIECE;
+			goto PICKING_UP_PIECE;
+		}
 
-		  // If it's a friendly piece continue
-		}else{
-			uint64_t possible_moves = moves_per_square(starting_square,move_list,move_count);
-
-			// Light up possible moves
-			set_color_according_to_val(MINT,buffer,possible_moves);
-			add_color_according_to_val(ORANGE,buffer,(1ULL<<starting_square));
-			ws2812_transmit(buffer,NUM_LEDS);
-			reset();
-
-			PLACE_PIECE:
-			current_board_state = new_board_state;
-
-			// Wait till the piece is placed somewhere
-			while(current_board_state == new_board_state){
-				current_board_state = shift_read_64bit();
-			}
-
-			// If the piece is placed back to the original square start the process again
-			if(current_board_state == board_start_state){
-				set_color_according_to_val(0,buffer,possible_moves);
-				ws2812_transmit(buffer,NUM_LEDS);
-				reset();
-
-				goto PICKING_UP_PIECE;
-			}
-
-			// If its a capture move
-			if(current_board_state < new_board_state){
-				uint64_t eaten_piece_index = current_board_state ^ new_board_state;
-				if(eaten_piece_index & possible_moves){
-					uint64_t desired_board_state = new_board_state;
-					// Wait till the piece gets put on the square we ate
-					while(current_board_state != desired_board_state){
-						current_board_state = shift_read_64bit();
-						uint64_t faulty_squares = current_board_state ^ desired_board_state;
-						add_color_according_to_val(RED,buffer,faulty_squares);
-						ws2812_transmit(buffer,NUM_LEDS);
-						reset();
-					}
-
-					current_piece_index2 = eaten_piece_index;
-					// If the position is not legal wait till the board is in start state and start the turn over
-				}else{
-					set_color_according_to_val(BLUE,buffer,eaten_piece_index | (1ULL<<starting_square));
+		// If its a capture move
+		if(current_board_state < new_board_state){
+			uint64_t eaten_piece_index = current_board_state ^ new_board_state;
+			if(eaten_piece_index & possible_moves){
+				uint64_t desired_board_state = new_board_state;
+				// Wait till the piece gets put on the square we ate
+				while(current_board_state != desired_board_state){
+					current_board_state = shift_read_64bit();
+					uint64_t faulty_squares = current_board_state ^ desired_board_state;
+					add_color_according_to_val(RED,buffer,faulty_squares);
 					ws2812_transmit(buffer,NUM_LEDS);
 					reset();
-					while(current_board_state != board_start_state){
-						current_board_state = shift_read_64bit();
-						uint64_t faulty_squares = current_board_state ^ new_board_state;
-						set_color_according_to_val(RED,buffer,faulty_squares | (1ULL<<starting_square));
-						ws2812_transmit(buffer,NUM_LEDS);
-						reset();
-					}
-					set_color_according_to_val(0,buffer,(1ULL<<starting_square));
-					ws2812_transmit(buffer,NUM_LEDS);
-					goto PICKING_UP_PIECE;
-
-				}
-			// If we are not eating a piece	XOR where the piece was placed
-			}else{
-				current_piece_index2 = (current_board_state ^ new_board_state);
-			}
-
-			// Calculate index of the square
-			ending_square = 0;
-			while (current_piece_index2 > 0) {
-				if(current_piece_index2 & 1)break;
-				current_piece_index2 = (current_piece_index2>>1);
-				ending_square++;
-			}
-
-			if((1ULL<<ending_square) & possible_moves){
-				move_made = LEGAL_MOVE;
-
-				uint32_t move_hash = starting_square | (ending_square<<6);
-				for(int i = 0; i < move_count;i++){
-					uint32_t real_hash = move_list[i] & 0xFFF;
-					if(real_hash == move_hash){
-						hash2 = move_list[i];
-						make_move(board,hash2,gamestate);
-						BOARD_LAST_STATE = shift_read_64bit();
-
-						gamestate->move_history[gamestate->move_number++] = hash2;
-						return;
-					}
 				}
 
+				current_piece_index2 = eaten_piece_index;
+			// If the position is not legal wait till the board is in start state and start the turn over
 			}else{
-				add_color_according_to_val(RED,buffer,(1ULL<<ending_square));
+				set_color_according_to_val(BLUE,buffer,eaten_piece_index | (1ULL<<starting_square));
 				ws2812_transmit(buffer,NUM_LEDS);
 				reset();
-
-				while(current_board_state != new_board_state){
+				while(current_board_state != board_start_state){
 					current_board_state = shift_read_64bit();
+					uint64_t faulty_squares = current_board_state ^ new_board_state;
+					set_color_according_to_val(RED,buffer,faulty_squares | (1ULL<<starting_square));
+					ws2812_transmit(buffer,NUM_LEDS);
+					reset();
 				}
-				goto PLACE_PIECE;
+				set_color_according_to_val(0,buffer,(1ULL<<starting_square));
+				ws2812_transmit(buffer,NUM_LEDS);
+				goto PICKING_UP_PIECE;
+
+			}
+		// If we are not eating a piece	XOR where the piece was placed
+		}else{
+			current_piece_index2 = (current_board_state ^ new_board_state);
+		}
+
+		// Calculate index of the square
+		ending_square = 0;
+		while (current_piece_index2 > 0) {
+			if(current_piece_index2 & 1)break;
+			current_piece_index2 = (current_piece_index2>>1);
+			ending_square++;
+		}
+
+		if((1ULL<<ending_square) & possible_moves){
+			move_made = LEGAL_MOVE;
+
+			uint32_t move_hash = starting_square | (ending_square<<6);
+			for(int i = 0; i < move_count;i++){
+				uint32_t real_hash = move_list[i] & 0xFFF;
+				if(real_hash == move_hash){
+					new_hash = move_list[i];
+					make_move(board,new_hash,gamestate);
+					BOARD_LAST_STATE = shift_read_64bit();
+
+					gamestate->move_history[gamestate->move_number++] = new_hash;
+					return;
+				}
+			}
+
+		}else{
+			add_color_according_to_val(RED,buffer,(1ULL<<ending_square));
+			ws2812_transmit(buffer,NUM_LEDS);
+			reset();
+
+			while(current_board_state != new_board_state){
+				current_board_state = shift_read_64bit();
+			}
+			goto PLACE_PIECE;
 			}
 		}
 	}
