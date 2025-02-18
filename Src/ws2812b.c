@@ -29,19 +29,20 @@ uint32_t compute_color(uint8_t r, uint8_t g,uint8_t b){
 
 	return ((uint32_t)(b | (g<<16) | (r<<8)));
 }
+
 void breathe(uint32_t color,uint64_t squares,uint32_t buffer[],uint16_t count,uint8_t delay){
 	uint32_t new_color = 0;
 	for(int i = 0; i < count;i++){
 		uint32_t prev_color = new_color + 1;
-			while(prev_color != new_color){
-				prev_color = new_color;
-				new_color = brighten(new_color,color);
+		while(prev_color != new_color){
+			prev_color = new_color;
+			new_color = brighten(new_color,color);
 
-				set_color_according_to_val(new_color,buffer,squares);
-				ws2812_transmit(buffer,NUM_LEDS);
-				reset();
-				tim2_delay_ms(delay);
-				}
+			set_color_according_to_val(new_color,buffer,squares);
+			ws2812_transmit(buffer,NUM_LEDS);
+			reset();
+			tim2_delay_ms(delay);
+		}
 		while(new_color > 0){
 			new_color = dimm(new_color);
 			set_color_according_to_val(new_color,buffer,squares);
@@ -49,9 +50,9 @@ void breathe(uint32_t color,uint64_t squares,uint32_t buffer[],uint16_t count,ui
 			reset();
 			tim2_delay_ms(delay);
 		}
-
 	}
 }
+
 uint32_t dimm(uint32_t color){
 	uint8_t r = (uint8_t)(color>>8);
 	uint8_t g = (uint8_t)(color>>16);
@@ -77,6 +78,7 @@ uint32_t dimm(uint32_t color){
 
 	return ((uint32_t)(b | (g<<16) | (r<<8)));
 }
+
 uint32_t brighten(uint32_t color, uint32_t target_color) {
     uint8_t r = (uint8_t)(color >> 8);
     uint8_t g = (uint8_t)(color >> 16);
@@ -116,6 +118,7 @@ uint32_t brighten(uint32_t color, uint32_t target_color) {
 void set_color(uint32_t color,uint8_t index,uint32_t* buffer){
 	buffer[index] = color;
 }
+
 void set_color_according_to_val(uint32_t color,uint32_t* buffer,uint64_t val){
 	for(int i = 0; i < NUM_LEDS;i++){
 		int col = i % 8;
@@ -127,6 +130,7 @@ void set_color_according_to_val(uint32_t color,uint32_t* buffer,uint64_t val){
 			buffer[corrected_index] = 0;
 	}
 }
+
 void add_color_according_to_val(uint32_t color,uint32_t* buffer,uint64_t val){
 	for(int i = 0; i < NUM_LEDS;i++){
 		int col = i % 8;
@@ -135,11 +139,13 @@ void add_color_according_to_val(uint32_t color,uint32_t* buffer,uint64_t val){
 			if(val & (1ULL<<i))buffer[corrected_index] = color;
 	}
 }
+
 void set_all(uint32_t color,uint32_t* buffer){
 	for(int i = 0;i < NUM_LEDS;i++){
 		buffer[i] = color;
 	}
 }
+
 void wake_up(uint32_t color,uint64_t squares,uint32_t buffer[],uint8_t delay){
 	uint32_t new_color = 0;
 	uint32_t prev_color = new_color + 1;
@@ -153,6 +159,7 @@ void wake_up(uint32_t color,uint64_t squares,uint32_t buffer[],uint8_t delay){
 			tim2_delay_ms(delay);
 		}
 }
+
 void sleep(uint32_t color,uint64_t squares,uint32_t buffer[],uint8_t delay){
 	while(color > 0){
 		color = dimm(color);
