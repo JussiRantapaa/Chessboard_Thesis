@@ -2,6 +2,7 @@
 #ifndef GAMELOGIC_H_
 #define GAMELOGIC_H_
 
+
 #define CHAR_TO_INT 97
 #define WHITE_PIECES 96
 #define EMPTY_SQUARE ' '
